@@ -1,0 +1,55 @@
+name: Node.js tests-only
+
+on:
+  [push, pull_request]
+
+jobs:
+  testonly:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        node_version: [14, 12, 10, 8, 6, 4]
+        eslint_version: [5, 4, 3, 2]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup NVM
+        run: |
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+
+      - name: Setup Node.js ${{ matrix.node_version }}
+        run: |
+          source ~/.nvm/nvm.sh
+          nvm install ${{ matrix.node_version }}
+
+      - name: Install latest npm for given node version
+        run: |
+          source ~/.nvm/nvm.sh
+          nvm install-latest-npm
+
+      - name: Install npm dependencies
+        env:
+          ESLINT_VERSION: ${{ matrix.eslint_version }}
+        run: |
+          NPM_CONFIG_LEGACY_PEER_DEPS=true npm install
+          npm run copy-metafiles
+
+      - name: Install specific eslint version
+        if: ${{ matrix.eslint_version != null }}
+        env:
+          ESLINT_VERSION: ${{ matrix.eslint_version }}
+        run: |
+          NPM_CONFIG_LEGACY_PEER_DEPS=true npm install
+          ./tests/dep-time-travel.sh
+          npm run pretest
+
+      - name: Run tests
+        run: npm run tests-only
+
+      - name: Upload coverage report to Codecov
+        uses: codecov/codecov-action@v4
+
